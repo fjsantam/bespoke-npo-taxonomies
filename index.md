@@ -14,7 +14,7 @@ IRS Exempt Organizations Form 1023-EZ Approvals - the files hosted here contain 
 ## Data Cleaning Steps
 
 1. Download the 2018 and 2019 files because the have the field "MISSION"
-   * See of the files for 2017, 2018, and 2019 [here](https://github.com/fjsantam/bespoke-npo-taxonomies/blob/main/DATA/Crosswalk%20of%20variables%20across%20all%202017-2018-2019.xlsx)
+   * See a crosswalk of the different variables available in the files for 2017, 2018, and 2019 [here](https://github.com/fjsantam/bespoke-npo-taxonomies/blob/main/DATA/Crosswalk%20of%20variables%20across%20all%202017-2018-2019.xlsx)
 2. Dropped all organizations with "", indicating blanks, in field "MISSION"
 3. Saved cleaned files as .CSV
 
