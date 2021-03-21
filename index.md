@@ -18,7 +18,8 @@ IRS Exempt Organizations Form 1023-EZ Approvals - the files hosted here contain 
 2. Dropped all organizations with "", indicating blanks, in field "MISSION"
 3. Saved cleaned files as .CSV
 
-# of observed applications:
+### Number of observed applications:
+
 Year | Step in Cleaning | Values
 -----|------------------|-------
 2018 | None, full source | 54,773
