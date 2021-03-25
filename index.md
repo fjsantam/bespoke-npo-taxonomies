@@ -3,9 +3,9 @@ layout: default
 title: Replication Files
 ---
 
-# Article:
+Replication files for the paper (under review):
 
-#### Santamarina, F. J., Lecy, J. D., & van Holm, E.J. How To Code A Million Missions: Developing Bespoke Nonprofit Activity Codes Using Machine Learning Algorithms.
+> Santamarina, F. J., Lecy, J. D., & van Holm, E.J. How To Code A Million Missions: Developing Bespoke Nonprofit Activity Codes Using Machine Learning Algorithms.
 
 # Data Sources
 
