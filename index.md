@@ -3,19 +3,19 @@ layout: default
 title: Replication Files
 ---
 
-# Replication Files for:
+# Article:
 
 #### Santamarina, F. J., Lecy, J. D., & van Holm, E.J. How To Code A Million Missions: Developing Bespoke Nonprofit Activity Codes Using Machine Learning Algorithms.
 
-## Data Sources
+# Data Sources
 
 IRS Exempt Organizations Form 1023-EZ Approvals - the files hosted here contain all approved 1023-EZ filings for tax exempt status filed in a year: [IRS files by year](https://www.irs.gov/charities-non-profits/exempt-organizations-form-1023-ez-approvals)
 
 For all data used and generated as part of this paper, please visit our Harvard Dataverse repository, [Replication Data for: Bespoke NPO Taxonomies](https://dataverse.harvard.edu/dataverse/bespoke-npo-taxonomies).
 
-## Replication Steps
+# Replication Steps
 
-### Data Cleaning Steps
+## Data Cleaning Steps
 
 [Files referenced in this section](https://doi.org/10.7910/DVN/BL6XLW)
 
@@ -27,7 +27,7 @@ For all data used and generated as part of this paper, please visit our Harvard 
 2. Drop all organizations with "", indicating blanks, in field "MISSION"
 3. Save cleaned files as .CSV for easier import into data analysis software
 
-#### Number of observed applications, before and after cleaning
+### Number of observed applications, before and after cleaning
 
 Year | Step in Cleaning | Description | Values
 -----|------------------|-------------|-------
@@ -43,14 +43,14 @@ In the cleaned files, I:
 * Added new column, "Year" - contains the year of the approved filings
 * Changed column "Ein" to "EIN"
 
-### [Pre-processing steps](/docs/Preprocessing_Replication.html)
+## [Pre-processing steps](/docs/Preprocessing_Replication.html)
 
 [Files referenced in this section](https://doi.org/10.7910/DVN/EO2HIM)
 
 *Citation:* 
 > Santamarina, Francisco, 2021, "Replication Data for: Bespoke NPO Taxonomies - preprocessed data", https://doi.org/10.7910/DVN/EO2HIM, Harvard Dataverse, V1 
 
-#### Detailed overview of approach
+### Detailed overview of approach
 
 Once the IRS raw data had the blanks removed and the three columns added, the text data needs to be cleaned. We performed three different sets of cleaning. As seen in the table below, "minimal" cleaning just standardizes the case of the text and reduces sparsity, or the number of cells in the dataset that contain a value of "0". 
 
@@ -75,9 +75,9 @@ All three datasets then went through the same, final pre-processing steps. The g
 
 
 
-### [Raw Data Files](https://dataverse.harvard.edu/dataverse/bespoke-npo-taxonomies)
+## [Raw Data Files](https://dataverse.harvard.edu/dataverse/bespoke-npo-taxonomies)
 
-### See Also: Coding Mission Statements  
+## See Also: Coding Mission Statements  
 
 For related projects, see here:
 
@@ -86,12 +86,12 @@ For related projects, see here:
 
 <br>
 
-## Source Code
+# Source Code
 
-### [GitHub](https://github.com/fjsantam/bespoke-npo-taxonomies)
+## [GitHub](https://github.com/fjsantam/bespoke-npo-taxonomies)
 
 
-## Citations
+# Citations
 Lewis, D. D., Yang, Y., Rose, T. G., & Li, F. (2004). Rcv1: A new benchmark collection for text categorization research. *Journal of machine learning research, 5*(Apr), 361-397.
 
 Manning, C. D., Schütze, H., & Raghavan, P. (2009). *Introduction to information retrieval.* Cambridge university press. Online edition. https://nlp.stanford.edu/IR-book/pdf/irbookonlinereading.pdf 
