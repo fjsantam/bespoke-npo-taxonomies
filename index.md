@@ -3,7 +3,7 @@ layout: default
 title: Replication Files
 ---
 
-Replication files for the paper (under review):
+This is a website that hosts replication steps and files for the paper (under review):
 
 > Santamarina, F. J., Lecy, J. D., & van Holm, E.J. How To Code A Million Missions: Developing Bespoke Nonprofit Activity Codes Using Machine Learning Algorithms.
 
@@ -72,8 +72,16 @@ Custom	| 104,072	| 1,865	| 99.2%
 
 All three datasets then went through the same, final pre-processing steps. The ground-truth values for the eight tax-exempt codes were used as-is. The NTEE codes were compiled into the 10 NTEE major Groups using the crosswalk provided by the NCCS (Jones 2019), generating 10 new columns populated with binary (0 = no, 1 = yes) values used to indicate if a document was associated with a given group. These 18 categories, in addition to five others from the original dataset (“Incorporatedstate”, “Donatefundsyes”, “Onethirdsupportpublic”, “Onethirdsupportgifts”, “Disasterreliefyes”), were merged with the corpus as columns of binary variables prior to applying analytical techniques.
 
+## [Classifcation steps](/docs/Classification_Bootstrapping_Replication)
 
+[Files referenced in this section](https://doi.org/10.7910/DVN/4GZJSK)
 
+*Citation:* 
+> Santamarina, Francisco, 2021, "Replication Data for: Bespoke NPO Taxonomies - classification steps", https://doi.org/10.7910/DVN/4GZJSK, Harvard Dataverse, V1 
+
+### Detailed overview of approach
+
+A training dataset of size N was randomly sampled from the full set of 104,072 documents in each corpus without replacement. We applied the default Naïve Bayes classifier algorithm in the quanteda package to predict taxonomy codes from the features extracted from the mission text (Benoit et al. 2018).  Accuracy was determined using an independent testing dataset of 20,000 documents for all iterations. The training dataset started with 4,000 pro-processed mission statements, and increased by increments of 4,000 up to a maximum of 80,000 mission statements in the training set. Sampling was repeated 100 times in a bootstrap approach to create a distribution of accuracy scores associated with each training dataset size. The procedure was repeated for the binary variables used to represent each of the tax-exempt purpose codes, NTEE major group codes, and several additional organizational classifications from the 1023-ez metadata. We ran the bootstrapped classifier on the simulation cluster of terminal servers offered by the University of Washington’s Center for Studies in Demography and Ecology. The bootstrapped classifier was applied in parallel to the 3 corpora using the R packages snow (Tierney et al., 2018) and parallel (R Core Team, 2020) on 66 cores. 
 
 ## [Raw Data Files](https://dataverse.harvard.edu/dataverse/bespoke-npo-taxonomies)
 
@@ -92,6 +100,9 @@ For related projects, see here:
 
 
 # Citations
+
+Benoit K, Watanabe K, Wang H, Nulty P, Obeng A, Müller S, Matsuo A (2018). “quanteda: An R package for the quantitative analysis of textual data.” *Journal of Open Source Software, 3*(30), 774. doi: 10.21105/joss.00774, https://quanteda.io.
+
 Lewis, D. D., Yang, Y., Rose, T. G., & Li, F. (2004). Rcv1: A new benchmark collection for text categorization research. *Journal of machine learning research, 5*(Apr), 361-397.
 
 Manning, C. D., Schütze, H., & Raghavan, P. (2009). *Introduction to information retrieval.* Cambridge university press. Online edition. https://nlp.stanford.edu/IR-book/pdf/irbookonlinereading.pdf 
@@ -102,5 +113,7 @@ Paxton, P., Velasco, K., & Ressler, R. (2019b). Form 990 Mission Stemmer v.1. [C
 
 *[Link to Paxton et al.'s files](https://www.pamelapaxton.com/990missionstatements)*
 
+R Core Team (2020). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
 
+Tierney, L., Rossini, A.J., Li, N., & Sevcikova, H. (2018). snow: Simple Network of Workstations. R package version 0.4-3. https://CRAN.R-project.org/package=snow
 
