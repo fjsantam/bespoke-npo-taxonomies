@@ -19,6 +19,9 @@ For all data used and generated as part of this paper, please visit our Harvard 
 
 [Files referenced in this section](https://doi.org/10.7910/DVN/BL6XLW)
 
+*Citation:* 
+> Santamarina, Francisco, 2021, "Replication Data for: Bespoke NPO Taxonomies - raw and cleaned data from IRS", https://doi.org/10.7910/DVN/BL6XLW, Harvard Dataverse, V1, UNF:6:klFnOYKBm1lUYLa3q6g+vA== [fileUNF] 
+
 1. Download the 2018 and 2019 files because they have the field "MISSION"
    * See a crosswalk of the different variables available in the files for 2017, 2018, and 2019 [here](https://dataverse.harvard.edu/file.xhtml?fileId=4468208&version=1.1); in the repository, it is the file named "Crosswalk of variables across all 2017-2018-2019"
 2. Drop all organizations with "", indicating blanks, in field "MISSION"
@@ -41,6 +44,11 @@ In the cleaned files, I:
 * Changed column "Ein" to "EIN"
 
 ### Pre-processing steps
+
+[Files referenced in this section](https://doi.org/10.7910/DVN/EO2HIM)
+
+*Citation:* 
+> Santamarina, Francisco, 2021, "Replication Data for: Bespoke NPO Taxonomies - preprocessed data", https://doi.org/10.7910/DVN/EO2HIM, Harvard Dataverse, V1 
 
 Once the IRS raw data had the blanks removed and the three columns added, the text data needs to be cleaned. We performed three different sets of cleaning. As seen in the table below, "minimal" cleaning just standardizes the case of the text and reduces sparsity, or the number of cells in the dataset that contain a value of "0". 
 
