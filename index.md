@@ -43,12 +43,14 @@ In the cleaned files, I:
 * Added new column, "Year" - contains the year of the approved filings
 * Changed column "Ein" to "EIN"
 
-### Pre-processing steps
+### [Pre-processing steps](/docs/Preprocessing_Replication.html)
 
 [Files referenced in this section](https://doi.org/10.7910/DVN/EO2HIM)
 
 *Citation:* 
 > Santamarina, Francisco, 2021, "Replication Data for: Bespoke NPO Taxonomies - preprocessed data", https://doi.org/10.7910/DVN/EO2HIM, Harvard Dataverse, V1 
+
+#### Detailed overview of approach
 
 Once the IRS raw data had the blanks removed and the three columns added, the text data needs to be cleaned. We performed three different sets of cleaning. As seen in the table below, "minimal" cleaning just standardizes the case of the text and reduces sparsity, or the number of cells in the dataset that contain a value of "0". 
 
@@ -62,7 +64,6 @@ reduce sparsity by removing features that appear less than 100 times and in less
 For “standard,” in addition to converting all source text to lower case, we applied common text pre-processing steps, including removing unnecessary white space and characters that consist of punctuation, numbers, symbols, and separators, while concatenating characters separate by a hyphen (e.g., “self-aware” becomes “selfaware”). Non-breaking spaces and common stopwords in the English language were also removed, using quanteda’s provided dictionary (drawn from Lewis et al., 2004). We reviewed the 100 n-grams (or “short subsequences of characters”; (Manning et al., 2009, p.26), defining character k-grams) of n = 3, or 3-grams, with the highest counts. Of the top 100 3-grams, we evaluated those that had frequencies of at least 150 (after which was a large drop in frequencies), then reviewed them to determine if they made sense to be treated as one token. This process was repeated with the top 100 2-grams that had frequencies of at least 600 (after which was a large drop in frequencies). The relevant character sequences were rewritten as a single token for the appropriate 3-grams and 2-grams, in that order. Any spaces remaining within tokens were then removed, and tokens were stemmed using the default quanteda stemming tool. Stemming is an attempt to derive the roots or common character sequences of words by removing trailing characters that denote distinctions irrelevant for our study: “profess”, “professing, and “professes” would thus become “profess”, whereas “professor” and “professors” would become “professor.”
 Steps for “custom” deviated for those from “standard” in two ways. Before removing non-letter characters, Paxton et al.’s (2019a) mission glossary was used to correct spelling errors and perform other corrections to the text. Instead of looking for the most common 3-grams and 2-grams to condense into single tokens and applying the default quanteda stemmer, we applied Paxton et al.’s (2019b) mission stemmer. Characteristics for all three document frequency matrices can be found in the table below.
 
-
 Cleaning Approach	| Documents	| Features	| Percent Sparse
 ------------------|-----------|----------|----------------
 Minimal	| 104,072	| 2,425	| 99.0%
@@ -74,11 +75,9 @@ All three datasets then went through the same, final pre-processing steps. The g
 
 
 
-### [Raw Data Files](https://github.com/lecy/political-ideology-of-nonprofits/tree/master/DATA/01-raw-data)
+### [Raw Data Files](https://dataverse.harvard.edu/dataverse/bespoke-npo-taxonomies)
 
-### [Data Steps](/CODE/01-data-steps.html)
-
-### Coding Mission Statements  
+### See Also: Coding Mission Statements  
 
 For related projects, see here:
 
