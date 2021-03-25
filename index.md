@@ -96,7 +96,7 @@ For related projects, see here:
 
 # Source Code
 
-## [GitHub](https://github.com/fjsantam/bespoke-npo-taxonomies)
+[GitHub repository](https://github.com/fjsantam/bespoke-npo-taxonomies)
 
 
 # Citations
