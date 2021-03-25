@@ -1,0 +1,550 @@
+---
+title: "Preprocessing Steps: Creating DFMs for Mission Statements"
+author: "Francisco J. Santamarina; Eric J. van Holm"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    keep_md: true
+    df_print: paged
+    theme: readable
+    highlight: tango
+    toc: yes
+    toc_float: yes
+    code_fold: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set( message = FALSE )
+```
+
+*Additional information on replication steps and data for this project can be found [on this GitHub page](https://fjsantam.github.io/bespoke-npo-taxonomies/)*
+
+This version of the tutorial uses the complete 2018 and 2019 approved 1023-EZ filings shared by the IRS, [located here](https://www.irs.gov/charities-non-profits/exempt-organizations-form-1023ez-approvals). The 2018 and 2019 files contain information such as mission statements and NTEE codes. The cleaned versions of the files, which we will be importing, have an additional column (Nteebasic) that just reports the first letter of the three-digit NTEE code, as well as have had applications with no mission statements (a blank value in that field) removed.
+
+```{r, echo=TRUE}
+library(quanteda)
+```
+
+#Preprocessing data on organization name and mission statement
+
+Call in both datasets
+
+```{r, echo=TRUE}
+dat_2018 <- read.csv( "https://dataverse.harvard.edu/api/access/datafile/4468213", stringsAsFactors=F )
+
+dat_2019 <- read.csv( "https://dataverse.harvard.edu/api/access/datafile/4468211", stringsAsFactors=F )
+```
+
+Reducing to the necessary columns and dropping any repeating observations, as determined by the unique combination of EIN, Year, and Mission values.
+
+```{r, echo=TRUE}
+dat_2018_2 <- dat_2018[ !duplicated( dat_2018[ , c( "EIN", "Year", "Mission" ) ] ),]
+dat_2019_2 <- dat_2019[ !duplicated( dat_2019[ , c( "EIN", "Year", "Mission" ) ] ),]
+```
+
+Return a matrix showing the difference in values.
+
+```{r}
+dropOutput <- data.frame( 
+  rbind( 
+    cbind( nrow( dat_2018), nrow (dat_2019) ),
+    cbind( nrow( dat_2018_2), nrow (dat_2019_2) )
+  ), 
+  row.names = c("Original Values", "Unique Values")
+)
+
+colnames( dropOutput ) <- c( "2018 Data", "2019 Data" )
+
+print( "Comparison of the original count of values and the unique count of values" )
+dropOutput
+```
+
+
+The 1023-EZ form contains text information which includes organizational name, which we will combine with the mission. We will starting by combining the two years' worth of data.
+
+```{r, echo=TRUE}
+mp <- rbind( dat_2018_2, dat_2019_2)
+mp$text <- paste( mp$Orgname1, mp$Orgname2, mp$Mission )
+mp.lim <- mp[, c("EIN", "text")]
+```
+
+
+In addition, we need to ensure that all variables are characters in order to change to corpus.
+
+```{r, echo=TRUE}
+mp.lim <- data.frame(lapply(mp.lim, as.character), stringsAsFactors=FALSE)
+```
+
+Convert data to a corpus using 'corpus' command from quanteda. `text_field` indicates which column holds the text data we want to analyze. Also creates a label for each listing in order to ensure the data is labeled through to the end of the analysis.
+
+
+```{r, echo=TRUE}
+mp.corp <- corpus(mp.lim,  text_field = "text")
+```
+
+We can look at the corpus to see how it's structured.
+
+```{r, echo=TRUE}
+mp.corp #return the first few values and characteristics of the corpus
+summary(mp.corp)[1:10,]
+```
+
+## Preprocessing steps before identifying Ngrams. 
+
+We can do many of these steps quickly while converting to a document feature matrix later, but want to do them explicitly before identifying Ngrams. We make the text lower case, break into tokens, and remove stopwords.
+
+Additional steps are inspired by those included in Pam Paxton's [mission glossary](https://www.pamelapaxton.com/990missionstatements) and [sample Python implementation code](https://www.pamelapaxton.com/s/00data_prep_glossary.py).
+
+We will be using the "glue" package to trim leading and trailing white spaces, when present.  
+
+
+```{r, echo=TRUE}
+library( glue )
+
+mp.corp2 <- trim( mp.corp ) # Remove leading and trailing white spaces when present
+
+mp.corp2 <- tolower(mp.corp2) # Convert all characters to lower case
+
+mp.corp2 <- gsub( "'", " ", mp.corp2) # Convert neutral quotation mark to space, as it may not be captured in functions below
+
+print( "Example output after basic pre-processing:")
+mp.corp2[2]
+
+mp.corp3 <- tokens(mp.corp2, 
+                   remove_punct = TRUE, # Removes all characters in the Unicode class "Punctuation" [P]
+                   remove_numbers = TRUE, # Removes tokens that are only numbers, leaves numbers if at start of words, ex. 2day
+                   remove_symbols = TRUE, # Removes all characters in the Unicode class "Symbol" [S]
+                   remove_separators = TRUE, #Removes all characters in the Unicode classes  "Separator" [Z] and "Control" [C]
+                   split_hyphens = FALSE # Do not split words that are connected by hyphenation. "Self-aware" should be "selfaware"
+                   )
+
+#For more information about unicode classes, see here: https://en.wikipedia.org/wiki/Unicode_character_property#General_Category
+#For more information on the arguments in the function token(), see here: https://quanteda.io/reference/tokens.html
+
+print( "Example output after advanced pre-processing:")
+mp.corp3[2]
+
+mp.corp4 <- tokens_remove( tokens(mp.corp3), 
+                           c(
+                             stopwords("english"), # Remove common English stopwords
+                             "nbsp" # Remove any non-breaking spaces
+                             ), 
+                           padding  = F # Do not leave an empty string where tokens had previously existed
+                           )
+
+#For more information about English stopwords, see here: https://rdrr.io/cran/stopwords/man/stopwords.html
+
+print( "Example output after final pre-processing to remove unwanted tokens:")
+mp.corp4[2]
+```
+
+# Creating the "standard" dataset 
+
+The standard dataset consists of removing unnecessary white space, characters, common stopwords, and using a combination of automated stemming and creating ngrams. Ngrams are combinations of words that we want to treat as a single type, or class of token. Instead of treating "non profit" as "non" and "profit", we actually want to treat it as a single type. We will do so in the following steps. 
+
+## Ngrams
+
+We will now look at Ngrams, specifically for combinations of 2 and 3 words. We will export the lists that were produced to look over to decide what we want to capture into a dictionary. This code can be updated once we have a larger list. 
+
+This section is broken out by ngram length, 3 words followed by 2. 
+
+## 3-gram, or ngram of length 3
+
+```{r, echo=TRUE}
+myNgram3 <- tokens(mp.corp4) %>%
+  tokens_ngrams(n = 3) %>%
+  dfm()
+
+myNgram3miss.df <- textstat_frequency(myNgram3)
+print( "Let's look at the top 10:")
+myNgram3miss.df[ 1:10 ]
+
+topfeatures(myNgram3, n = 100 )
+
+```
+
+Let's see what the distribution of frequency values looks like. We will cap the y-axis at 100, to make it easier to see how many ngrams have frequencies that are less unique. Looking at the rightmost bin, only two ngrams appear more than 1,000 times each.  
+
+```{r, echo=TRUE}
+h1 <- hist( myNgram3miss.df$frequency , ylim = c(0, 100) )
+text(h1$mids,h1$counts,labels=h1$counts, adj=c(0.5, -0.5))
+# Code from: https://www.datamentor.io/r-programming/histogram/
+```
+
+As seen in the histogram above, there is a big jump from just under 100 to the previous value. This roughly corresponds to the frequency values of less than 150. I'll go ahead and export a list of the ngrams of length 3 that appear at least 150 times, then reconcile them - identifying tokens that should be considered as multi-word tokens. I'll do this outside of R.
+
+```{r, echo=TRUE, eval=FALSE}
+write.csv( x = myNgram3miss.df[myNgram3miss.df$frequency >= 150 ],
+            file = "~/ngrams_3count.csv",
+            col.names = TRUE )
+```
+
+## 2-gram, or ngram of length 2
+
+Let's repeat this process for ngrams of length 2.
+
+```{r, echo=TRUE}
+myNgram2 <- tokens(mp.corp4) %>%
+  tokens_ngrams(n = 2) %>%
+  dfm()
+
+myNgram2miss.df <- textstat_frequency(myNgram2)
+print( "Let's look at the top 10:")
+myNgram2miss.df[ 1:10 ]
+
+topfeatures(myNgram2, n = 100 )
+
+```
+
+Histogram of frequency values:
+
+```{r, echo=TRUE}
+h2 <- hist( myNgram2miss.df$frequency , ylim = c(0, 100) )
+text(h2$mids,h2$counts,labels=h2$counts, adj=c(0.5, -0.5))
+# Code from: https://www.datamentor.io/r-programming/histogram/
+```
+
+The big jump here roughly corresponds to the frequency values of less than 600. I'll go ahead and export a list of the ngrams of length 2 that appear at least 600 times, then reconcile them outside of R.
+
+```{r, echo=TRUE, eval=FALSE}
+write.csv( x = myNgram2miss.df[myNgram2miss.df$frequency >= 600 ],
+            file = "~/ngrams_2count.csv",
+            col.names = TRUE )
+```
+
+We can see the top candidates and others with the data created. Now create a dictionary in order to identify and transform those combinations of words into a single ngram
+
+```{r, echo=TRUE}
+# Read in the ngram combinations identified in the exported lists
+ngrams3_dict <- dictionary( list( internal_revenue_code=c('internal revenue code'),
+                                  high_school_students=c('high school students'),
+                                  youth_young_adults=c('youth young adults'),
+                                  low_income_families=c('low income families'),
+                                  parent_teacher_organization=c('parent teacher organization'),
+                                  amateur_sports_competition=c('amateur sports competition'),
+                                  nonprofit_organization=c('non profit organization'),
+                                  federal_tax_code=c('federal tax code'),
+                                  volunteer_fire_department=c('volunteer fire department'),
+                                  middle_high_school=c('middle high school') ))
+
+ngrams2_dict <- dictionary(list( high_school=c('high school'),
+                                 section_c=c('section c'),
+                                 quality_life=c('quality life'),
+                                 organizations=c('organization s'),
+                                 life_skills=c('life skills'),
+                                 mental_health=c('mental health'),
+                                 low_income=c('low income'),
+                                 financial_assistance=c('financial assistance'),
+                                 individuals_families=c('individuals families'),
+                                 community_outreach=c('community outreach'),
+                                 united_states=c('united states'),
+                                 young_adults=c('young adults'),
+                                 internal_revenue=c('internal revenue'),
+                                 revenue_code=c('revenue code'),
+                                 community_service=c('community service'),
+                                 community_development=c('community development'),
+                                 elementary_school=c('elementary school'),
+                                 special_needs=c('special needs'),
+                                 general_public=c('general public'),
+                                 youth_sports=c('youth sports'),
+                                 provide_assistance=c('provide assistance'),
+                                 c_internal=c('c internal'),
+                                 local_community=c('local community'),
+                                 middle_school=c('middle school'),
+                                 nonprofit=c('non profit'),
+                                 school_students=c('school students'),
+                                 charitable_organization=c('charitable organization'),
+                                 young_people=c('young people'),
+                                 school_district=c('school district'),
+                                 children_families=c('children families'),
+                                 law_enforcement=c('law enforcement'),
+                                 specific_purpose=c('specific purpose'),
+                                 nonprofit_organization=c('nonprofit organization','non-profit organization'), 
+                                 animal_rescue=c('animal rescue'), 
+                                 youth_baseball=c('youth baseball'), 
+                                 support_services=c('support services') ))
+                           
+mp.corp5 <- tokens_compound(mp.corp4, pattern = ngrams3_dict)
+mp.corp6 <- tokens_compound(mp.corp5, pattern = ngrams2_dict)
+mp.corp7 <- sapply(mp.corp6, paste, collapse=c(" ", "  "))
+```
+
+converting to a document frequency matrix as a final step, and removing stems.
+
+```{r, echo=TRUE}
+mp.dfm <- dfm(mp.corp7,
+                   stem = T)
+mp.dfm
+topfeatures(mp.dfm, 20)
+
+```
+
+As seen in the output above "sparse" refers to the number of cells that have zero counts, per the documentation on the [quanteda website](https://quanteda.io/reference/sparsity.html). The value that we get above suggest a massive number of cells in our document frequency matrix that have zero counts, which we can narrow in on:
+
+```{r, echo=TRUE}
+sparsity( mp.dfm)
+
+```
+
+If we try to convert the DFM to a data frame, we will have a total cell count of:
+
+```{r}
+prod(dim(mp.dfm))
+```
+
+We will follow the guidance on [this Stack Overflow page](https://stackoverflow.com/questions/58302449/what-does-the-cholmod-error-problem-too-large-means-exactly-problem-when-conv) to trim down the number of features that do not appear frequently or in many documents. We will use basic values, such as the term must appear at least 100 times and in at least 100 documents. If I didn't do this step, my instance of R and computer wouldn't let me convert the dfm to a data frame - not enough space in my RAM.
+
+```{r}
+mp.dfm2 <- dfm_trim(mp.dfm, min_docfreq = 100, min_termfreq = 100, verbose = TRUE)
+mp.dfm2
+
+print( "Previous cell count: ")
+prod(dim(mp.dfm))
+
+print( "New cell count: ")
+prod(dim(mp.dfm2))
+
+print( "Percent Change, (new - old) / old):")
+(prod(dim(mp.dfm2)) - prod(dim(mp.dfm)) ) / prod(dim(mp.dfm))
+```
+
+Now converting the DFM to a data frame and combining with corpus and original data.
+
+```{r, echo=TRUE}
+
+mp.dfm.df <- convert(mp.dfm2, to = "data.frame")
+mp.corpus.df <- as.data.frame(mp.corp7)
+
+colnames(mp.corpus.df) <- "Corpus"
+
+
+full.data <- cbind(mp, mp.corpus.df)
+full.data2 <- cbind(full.data, mp.dfm.df)
+
+
+```
+
+Export the full dataset with **standard** cleaning:
+
+```{r, echo=TRUE, eval=FALSE}
+write.csv( x = full.data2,
+            file = "~/full_data_standard_cleaning.csv",
+            col.names = TRUE )
+```
+
+# Creating the "minimal" dataset: No n-grams or stemming
+
+If you recall, mp.corp2 is a version of the corpus with minimal pre-processing done:
+* leading and lagging white space was removed
+* all text was put in lower case
+* certain quotation marks were changed into spaces
+
+We will generate a DFM using this mostly unprocessed dataset, and with no stemming.
+
+```{r}
+mp.dfm_basic <- dfm(mp.corp2,
+                   stem = F)
+mp.dfm_basic
+topfeatures(mp.dfm_basic, 20)
+```
+
+Repeating some of the same steps as before to address sparsity:
+
+```{r}
+mp.dfm_basic2 <- dfm_trim(mp.dfm_basic, min_docfreq = 100, min_termfreq = 100, verbose = TRUE)
+mp.dfm_basic2
+
+print( "Previous cell count: ")
+prod(dim(mp.dfm_basic))
+
+print( "New cell count: ")
+prod(dim(mp.dfm_basic2))
+
+print( "mp.dfm_basic2 Change, (new - old) / old):")
+(prod(dim(mp.dfm_basic2)) - prod(dim(mp.dfm_basic)) ) / prod(dim(mp.dfm_basic))
+```
+
+
+Now converting the mostly unprocessed DFM to a data frame and combining with corpus and original data
+
+```{r, echo=TRUE}
+
+mp.dfm_basic.df <- convert(mp.dfm_basic2, to = "data.frame")
+
+
+#mp.corpus.df <- as.data.frame(mp.corp7)
+#colnames(mp.corpus.df) <- "Corpus"
+#full.data <- cbind(mp, mp.corpus.df)
+
+full.data2_basic <- cbind(full.data, mp.dfm_basic.df)
+
+
+```
+
+
+Export the full, mostly unprocessed dataset with **minimal** cleaning:
+
+```{r, echo=TRUE, eval=FALSE}
+write.csv( x = full.data2,
+            file = "~/full_data_minimal_cleaning.csv",
+            col.names = TRUE )
+```
+
+
+# Creating the "custom" dataset using NPO-sector dictionary and stemming
+
+Pam Paxton and her team have created a [nonprofit mission statement glossary and stemmer](https://www.pamelapaxton.com/990missionstatements). As compared to the custom glossary/dictionary and default stemming methods used above, let alone the minimal processing, below implements those two sector-wide and sector-specific tools.*This approach will not include the ngram consolidation.
+
+```{r, echo=TRUE, eval=FALSE}
+glossary <- read.csv("~/glossaryv1.csv",
+            col.names = TRUE )
+```
+
+We will use the glossary to clean up misspellings during the pre-processing, after the minimal steps are done.
+
+```{r}
+library( glue )
+
+mp.corp2 <- trim( mp.corp ) # Remove leading and trailing white spaces when present
+
+mp.corp2 <- tolower(mp.corp2) # Convert all characters to lower case
+
+mp.corp2 <- gsub( "'", " ", mp.corp2) # Convert neutral quotation mark to space, as it may not be captured in functions below
+
+print( "Example output after basic pre-processing:")
+mp.corp2[2]
+```
+
+I leverage a function that creates a custom dictionary of stems to apply the spelling corrections. 
+
+https://cran.r-project.org/web/packages/corpus/vignettes/stemmer.html
+
+```{r}
+#library( textclean )
+#mp.corp2.alt <- mgsub(mp.corp2, glossary$word, glossary$fix)
+
+
+library( corpus )
+
+stemmer_glossary <- new_stemmer( glossary$word, glossary$fix) # Orienting the misspelled word as the term and fix as the stem
+mp.corp2.alt <- text_tokens( x = mp.corp2, stemmer = stemmer_glossary )
+
+print( "Example output after cleaning up spelling errors:")
+mp.corp2.alt[2]
+
+```
+
+
+```{r}
+mp.corp3.alt <- tokens(mp.corp2.alt, 
+                   remove_punct = TRUE, # Removes all characters in the Unicode class "Punctuation" [P]
+                   remove_numbers = TRUE, # Removes tokens that are only numbers, leaves numbers if at start of words, ex. 2day
+                   remove_symbols = TRUE, # Removes all characters in the Unicode class "Symbol" [S]
+                   remove_separators = TRUE, #Removes all characters in the Unicode classes  "Separator" [Z] and "Control" [C]
+                   split_hyphens = FALSE # Do not split words that are connected by hyphenation. "Self-aware" should be "selfaware"
+                   )
+
+#For more information about unicode classes, see here: https://en.wikipedia.org/wiki/Unicode_character_property#General_Category
+#For more information on the arguments in the function token(), see here: https://quanteda.io/reference/tokens.html
+
+print( "Example output after advanced pre-processing:")
+mp.corp3.alt[2]
+
+mp.corp4.alt <- tokens_remove( tokens(mp.corp3.alt), 
+                           c(
+                             stopwords("english"), # Remove common English stopwords
+                             "nbsp" # Remove any non-breaking spaces
+                             ), 
+                           padding  = F # Do not leave an empty string where tokens had previously existed
+                           )
+
+#For more information about English stopwords, see here: https://rdrr.io/cran/stopwords/man/stopwords.html
+
+print( "Example output after final pre-processing to remove unwanted tokens:")
+mp.corp4.alt[2]
+
+
+#Skipping ngrams
+mp.corp6.alt <- sapply(mp.corp4.alt, paste, collapse=c(" ", "  "))
+```
+
+Now to import the customer stemmers. 
+
+```{r, echo=TRUE, eval=FALSE}
+stems_paxton <- read.csv("~/Mission_Stemmer_v1.csv",
+            col.names = TRUE )
+```
+
+We need to modify it to treat any blanks in the source file as indicating no change, rather an indicating a true blank (i.e., remove).
+
+```{r}
+for( i in 1:nrow(stems_paxton)){
+  if( stems_paxton[ i, "Stem" ] == "" ){
+    stems_paxton[ i, "Stem" ] <- stems_paxton[ i, "word" ]
+  }
+  
+}
+
+```
+
+Now to implement the stemmer.
+
+```{r, echo=TRUE}
+stemmer_paxton <- new_stemmer( stems_paxton$word, stems_paxton$Stem) 
+mp.corp6.alt <- text_tokens( x = mp.corp6.alt, stemmer = stemmer_paxton )
+
+print( "Example output after cleaning up spelling errors:")
+mp.corp6.alt[2]
+
+#Collapse down again
+mp.corp7.alt <- sapply(mp.corp6.alt, paste, collapse=c(" ", "  "))
+
+
+mp.dfm <- dfm(mp.corp7.alt,
+                   stem = F)
+mp.dfm
+topfeatures(mp.dfm, 20)
+
+```
+
+Repeating some of the same steps as before to address sparsity:
+
+```{r}
+mp.dfm2 <- dfm_trim(mp.dfm, min_docfreq = 100, min_termfreq = 100, verbose = TRUE)
+mp.dfm2
+
+print( "Previous cell count: ")
+prod(dim(mp.dfm))
+
+print( "New cell count: ")
+prod(dim(mp.dfm2))
+
+print( "mp.dfm_basic2 Change, (new - old) / old):")
+(prod(dim(mp.dfm2)) - prod(dim(mp.dfm)) ) / prod(dim(mp.dfm))
+```
+
+
+Now converting the mostly unprocessed DFM to a data frame and combining with corpus and original data
+
+```{r, echo=TRUE}
+
+mp.dfm.df <- convert( mp.dfm2, to = "data.frame" )
+
+
+mp.corpus.df <- as.data.frame( mp.corp7.alt )
+colnames( mp.corpus.df ) <- "Corpus"
+full.data <- cbind( mp, mp.corpus.df )
+
+full.data2 <- cbind( full.data, mp.dfm.df )
+
+
+```
+
+
+Export the full dataset with **customized** cleaning:
+
+```{r, echo=TRUE, eval=FALSE}
+write.csv( x = full.data2,
+            file = "~/full_data_custom_cleaning.csv",
+            col.names = TRUE )
+```
