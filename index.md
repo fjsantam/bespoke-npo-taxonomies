@@ -24,7 +24,7 @@ For all data used and generated as part of this paper, please visit our Harvard 
 2. Drop all organizations with "", indicating blanks, in field "MISSION"
 3. Save cleaned files as .CSV for easier import into data analysis software
 
-### Number of observed applications, before and after cleaning
+#### Number of observed applications, before and after cleaning
 
 Year | Step in Cleaning | Description | Values
 -----|------------------|-------------|-------
@@ -39,6 +39,30 @@ In the cleaned files, I:
 * Added new column, "Nteebasic" - only reports the first letter from the 3-character "Nteecode" field
 * Added new column, "Year" - contains the year of the approved filings
 * Changed column "Ein" to "EIN"
+
+### Pre-processing steps
+
+Once the IRS raw data had the blanks removed and the three columns added, the text data needs to be cleaned. We performed three different sets of cleaning. As seen in the table below, "minimal" cleaning just standardizes the case of the text and reduces sparsity, or the number of cells in the dataset that contain a value of "0". 
+
+minimal	| standard	| custom
+--------|-----------|-------
+make all text lower case | minimal steps, and | minimal steps, and
+reduce sparsity by removing features that appear less than 100 times and in less than 100 documents | removing unnecessary white space and characters (punctuation, numbers, symbols, and separators) | removing unnecessary white space and characters (punctuation, numbers, symbols, and separators)
+ | remove non-breaking spaces and common stopwords | remove non-breaking spaces and common stopwords
+  | tokenize most common ngrams | apply Paxton’s custom dictionary (2019a) to tokenize ngrams 
+
+For “standard,” in addition to converting all source text to lower case, we applied common text pre-processing steps, including removing unnecessary white space and characters that consist of punctuation, numbers, symbols, and separators, while concatenating characters separate by a hyphen (e.g., “self-aware” becomes “selfaware”). Non-breaking spaces and common stopwords in the English language were also removed, using quanteda’s provided dictionary (drawn from Lewis et al., 2004). We reviewed the 100 n-grams (or “short subsequences of characters”; (Manning et al., 2009, p.26), defining character k-grams) of n = 3, or 3-grams, with the highest counts. Of the top 100 3-grams, we evaluated those that had frequencies of at least 150 (after which was a large drop in frequencies), then reviewed them to determine if they made sense to be treated as one token. This process was repeated with the top 100 2-grams that had frequencies of at least 600 (after which was a large drop in frequencies). The relevant character sequences were rewritten as a single token for the appropriate 3-grams and 2-grams, in that order. Any spaces remaining within tokens were then removed, and tokens were stemmed using the default quanteda stemming tool. Stemming is an attempt to derive the roots or common character sequences of words by removing trailing characters that denote distinctions irrelevant for our study: “profess”, “professing, and “professes” would thus become “profess”, whereas “professor” and “professors” would become “professor.”
+Steps for “custom” deviated for those from “standard” in two ways. Before removing non-letter characters, Paxton et al.’s (2019a) mission glossary was used to correct spelling errors and perform other corrections to the text. Instead of looking for the most common 3-grams and 2-grams to condense into single tokens and applying the default quanteda stemmer, we applied Paxton et al.’s (2019b) mission stemmer. Characteristics for all three document frequency matrices can be found in the table below.
+
+
+Cleaning Approach	| Documents	| Features	| Percent Sparse
+------------------|-----------|----------|----------------
+Minimal	| 104,072	| 2,425	| 99.0%
+Standard	| 104,072	| 1,855	| 99.2%
+Custom	| 104,072	| 1,865	| 99.2%
+
+All three datasets then went through the same, final pre-processing steps. The ground-truth values for the eight tax-exempt codes were used as-is. The NTEE codes were compiled into the 10 NTEE major Groups using the crosswalk provided by the NCCS (Jones 2019), generating 10 new columns populated with binary (0 = no, 1 = yes) values used to indicate if a document was associated with a given group. These 18 categories, in addition to five others from the original dataset (“Incorporatedstate”, “Donatefundsyes”, “Onethirdsupportpublic”, “Onethirdsupportgifts”, “Disasterreliefyes”), were merged with the corpus as columns of binary variables prior to applying analytical techniques.
+
 
 
 
@@ -60,6 +84,16 @@ For related projects, see here:
 ### [GitHub](https://github.com/fjsantam/bespoke-npo-taxonomies)
 
 
+## Citations
+Lewis, D. D., Yang, Y., Rose, T. G., & Li, F. (2004). Rcv1: A new benchmark collection for text categorization research. *Journal of machine learning research, 5*(Apr), 361-397.
+
+Manning, C. D., Schütze, H., & Raghavan, P. (2009). *Introduction to information retrieval.* Cambridge university press. Online edition. https://nlp.stanford.edu/IR-book/pdf/irbookonlinereading.pdf 
+
+Paxton, P., Velasco, K., & Ressler, R.. (2019a). Form 990 Mission Glossary v.1. [Computer file]. Ann Arbor, MI: Inter-university Consortium for Political and Social Research [distributor].
+
+Paxton, P., Velasco, K., & Ressler, R. (2019b). Form 990 Mission Stemmer v.1. [Computer file]. Ann Arbor, MI: Inter-university Consortium for Political and Social Research [distributor].
+
+*[Link to Paxton et al.'s files](https://www.pamelapaxton.com/990missionstatements)*
 
 
 
