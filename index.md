@@ -43,7 +43,7 @@ In the cleaned files, I:
 * Added new column, "Year" - contains the year of the approved filings
 * Changed column "Ein" to "EIN"
 
-## [Pre-processing steps](bespoke-npo-taxonomies/docs/Preprocessing_Replication.html)
+## [Pre-processing steps](docs/Preprocessing_Replication.html)
 
 [Files referenced in this section](https://doi.org/10.7910/DVN/EO2HIM)
 
@@ -72,7 +72,7 @@ Custom	| 104,072	| 1,865	| 99.2%
 
 All three datasets then went through the same, final pre-processing steps. The ground-truth values for the eight tax-exempt codes were used as-is. The NTEE codes were compiled into the 10 NTEE major Groups using the crosswalk provided by the NCCS (Jones 2019), generating 10 new columns populated with binary (0 = no, 1 = yes) values used to indicate if a document was associated with a given group. These 18 categories, in addition to five others from the original dataset (“Incorporatedstate”, “Donatefundsyes”, “Onethirdsupportpublic”, “Onethirdsupportgifts”, “Disasterreliefyes”), were merged with the corpus as columns of binary variables prior to applying analytical techniques.
 
-## [Classification steps](bespoke-npo-taxonomies/docs/Classification_Bootstrapping_Replication)
+## [Classification steps](docs/Classification_Bootstrapping_Replication)
 
 [Files referenced in this section](https://doi.org/10.7910/DVN/4GZJSK)
 
