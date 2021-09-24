@@ -1,0 +1,551 @@
+---
+title: "Appendix of Additional Performance Analysis Measures"
+author: "Francisco J. Santamarina"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    keep_md: true
+    df_print: paged
+    theme: readable
+    highlight: tango
+    toc: yes
+    toc_float: yes
+    code_fold: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set( message=F, warning=F, fig.width=10 )
+# Set the local address - not necessary for this step
+#knitr::opts_knit$set( progress=T, root.dir= "data/step-05-files-to-analyze")
+```
+
+In this tutorial document, we will expand on the fifth step to explore additional measures to help us understand and identify peaks and plateaus in classifier performance gains as a function of increasing the training dataset size. This appendix assumes that you are focused on balanced accuracy, but you can adapt the code in Step 5 to identify or include additional metric types, specifically, following all steps to generate `df.sumamry` up to "Analyzing the results" > "Filtering on Balanced Accuracy".
+
+*Additional information on replication steps and data for this project can be found [on this GitHub page](https://fjsantam.github.io/bespoke-npo-taxonomies/)*
+
+# Introduction
+
+Now that we have [consolidated our various result output files into a single dataset](https://fjsantam.github.io/bespoke-npo-taxonomies/step-04-combine-bootstrap-output-files.html), we need to analyze the algorithm performance. 
+
+Below are the libraries that we will use.
+
+```{r, messages = F, class.source = "fold-show"}
+library( dplyr ) # for data wrangling
+library( DT ) # for datatables and interactive tables in rmarkdown
+library( ggplot2 ) # for visualizations
+library( scales ) # for visualizations
+```
+
+## Read in the data
+
+If you have just completed step 5, then the necessary datasets are still in your active environment. If not, then read in the .Rdata file of consolidated results that we created. This file should be saved in a folder in your working directory called "FINAL".
+
+
+**read in summary data**
+
+```{r, include = F}
+load( "data/step-05-files-to-analyze/BOOTSTRAP-RESULTS.Rdata" )
+```
+
+
+```{r, class.source = "fold-show", eval = F}
+load( "FINAL/BOOTSTRAP-RESULTS.Rdata" )
+```
+
+
+
+
+# Additional Measures
+
+## Rolling Average
+
+As discussed in the source article (see the [GitHub page](https://fjsantam.github.io/bespoke-npo-taxonomies/), part of our goal with this project is to identify at what point the gains from increasing the training dataset size decreases, in other words, the threshold for diminishing returns. If we focus solely on the gains in performance achieved from moving between two training dataset sizes (*step increase*), we will run the risk of focusing solely on local maxima and minima. To control for this, we propose a method using a "rolling average" of that value change and the subsequent value changes, i.e., the average from a local neighborhood. A true plateau in performance would thus be the change in performance which is greatest from its rolling average, which we refer to as the distance from the rolling average. This method limits us from analyzing the last two differences in training dataset size, the increases from 72,000 to 76,missions cases and from 76,000 to 80,000 missions. We feel comfortable in using this approach because we expect the performance gains to plateau in the earlier or middle range of training dataset sizes, and performance gains to remain relatively flat in the later range of training dataset sizes, e.g., when comparing performance of large training dataset sizes.
+
+### How it is coded
+
+The following codechunk demonstrates the code that will be used to determine distance from rolling average, where k represents a given dataset size, such as 4,000 missions.
+
+1. Calculate the difference in balanced accuracy between the two sizes, ex. the averaged balanced accuracy for 8,000 missions minus the averaged balanced accuracy for 4,000 missions. 
+  + *Optional*: Calculate the percent change: (new - old ) / old. We can also use the value from step 1 as our numerator. This is to help us understand performance gains rather than act as an integral part of the calculation
+2. Calculate the rolling average by take the average of the value from step 1 and the difference between the next two step increases (ex. 8,000 to 12,000 and 12,000 to 16,000).
+3. Calculate the difference from the rolling average, the value from step 1 minus the value from step 2.
+
+```{r, eval = F, class.source = "fold-show"}
+#1
+initial.distance <- ( k + 1 ) - k 
+
+#Optional:
+percent.change <- initial.distance / k
+
+#2
+rolling.average <- mean( c(
+  ( k + 1 ) - k ,        #the distance calculated in step 2
+  ( k + 2 ) - ( k + 1 ), #one step increase larger
+  ( k + 3 ) - ( k + 2 )  #two step increases larger
+)) 
+        
+#3
+distance.from.rolling.average <-  initial.distance - rolling average
+
+```
+ 
+The code chunk below converts the pseudocode into a usable function, `find_rolling_averag`.
+
+```{r}
+
+find_rolling_average <- function( dataset, column, row ){
+  #Note the training dataset sizes used for k and k+1
+  k <- as.numeric(dataset[ row, "n.train" ])
+  k_1 <- as.numeric(dataset[ row+1, "n.train" ])
+  
+  #1
+  initial.distance <- ( dataset[row+1, column] ) - dataset[row, column] 
+  
+  #Optional:
+  percent.change <- initial.distance / dataset[row, column] 
+  
+  #2
+  rolling.average <- mean( 
+    as.numeric(
+      c(
+        dataset[row+1, column] - dataset[row, column]  ,  #the distance calculated in step 2
+        dataset[row+2, column] - dataset[row+1, column] , #one step increase larger
+        dataset[row+3, column] - dataset[row+2, column]   #two step increases larger
+      )#close c()
+    )#close as.numeric()
+  )#close mean()
+          
+  #3
+  distance.from.rolling.average <-  initial.distance - rolling.average
+  
+  output <- cbind(k, k_1, initial.distance, percent.change, rolling.average, distance.from.rolling.average)
+  colnames( output ) <- c("k", "k+1", "initial.distance", "percent.change", "rolling.average", "distance.from.rolling.average")
+  return( output )
+}
+
+```
+
+
+### LOWESS
+
+To act as a counterpoint to the raw data, we can use a non-parametric locally-weighted polynomial regression (LOWESS) smoothing function to help us generate a model to identify predicted balanced accuracies for each dataset size.
+
+We can leverage our function to calculate rolling average for this purpose. A demonstration of how to do this and a related visualization follows below.
+
+### Visualizing distance from rolling average
+
+#### Demonstration
+
+To assist with the comparison of the measures of distance from rolling average and average balanced accuracy, let's view the graph generated earlier (preview of average balanced accuracy) with one showcasing our new measure.
+
+Below is the code used to create our demo dataset, done before we filtered the performance summary dataset.
+
+```{r, eval = F, class.source = "fold-show"}
+df.demo <- 
+  df.summary %>% 
+  filter( prediction.class=="ntmaj10art" & metric.type=="Balanced.Accuracy" ) 
+```
+
+Let's create a dedicated dataset for distance from rolling average. We can wrap our function in a loop to generate data for all of our rows. This time, let's preview the last few rows. As noted earlier, because of how the rolling average neighborhood is defined, we have no values for the last few steps.
+
+```{r}
+df.demo.DfRA <- as.data.frame(NULL)
+
+for( i in 1:( nrow( df.demo ) ) ){
+  temp <- find_rolling_average( dataset = df.demo, column = "value", row = i )
+  df.demo.DfRA <- rbind( df.demo.DfRA, temp )
+}
+
+tail(df.demo.DfRA)
+```
+
+We will also create a dedicated dataset for predicted distances from rolling average, drawn from the predicted average balanced accuracy scores generated by a LOWESS model.
+
+```{r}
+x <- df.demo$n.train
+y <- df.demo$value
+    
+lw <- as.data.frame( lowess( y ~ x ) ) 
+lw$"n.train" <- lw$x
+
+df.demo.LOWESS <- as.data.frame(NULL)
+
+for( i in 1:( length( lw$y ) ) ){
+  temp <- find_rolling_average( dataset = lw, column = "y", row = i )
+  df.demo.LOWESS <- rbind( df.demo.LOWESS, temp )
+}
+
+tail(df.demo.LOWESS)
+```
+
+Now let's compare our three preview graphics, in order:
+
+1. Average balanced accuracy 
+2. Distance from rolling averages
+3. Predicted distances from rolling averages
+
+Guidance on how to present the graphics cleanly is provided [here](https://bookdown.org/yihui/rmarkdown-cookbook/figures-side.html).
+
+```{r, figures-demo, fig.show="hold", out.width="90%"}
+par(mar = c(4, 4, 5, .1))
+
+# Demo graph from before
+x <- df.demo$n.train
+y <- df.demo$value
+plot( x, y, type="b",  bty="n", xaxt="n", yaxt="n",
+      pch=19, col=gray( 0.0,0.25), cex=1.8,
+      xlab="Training Dataset Size", ylab="Balanced Accuracy",
+      main = "Preview of Averaged Balanced Accuracy for NTEE\nMajor 10 Group Art with Standard Cleaning",
+      cex.main = 1)
+axis( side = 2, at = seq(0.01, 1.00, 0.01) )
+axis( side = 1, at= seq(0,max(df.demo$n.train),max(df.demo$n.train)/10) )
+abline( h=seq(0.01, 1.00, 0.01), lwd=0.5, col=gray(0.7,0.3) )
+abline( v=seq(0,max(df.demo$n.train),max(df.demo$n.train)/10), lwd=0.5, col=gray(0.7,0.3) )
+lines( lowess(x,y), col="firebrick", lty=1, lwd=4 )
+box( col=gray(0.7,0.3) )
+points( x, y, type="b", pch=19, col=gray( 0.0,0.25), cex=1.8 )
+
+
+# Rolling Average demo graph
+
+x <- df.demo.DfRA$k
+y <- df.demo.DfRA$distance.from.rolling.average
+
+x_lab_sequence <- seq(0,max(df.demo$n.train),max(df.demo$n.train)/10)
+x_labels <- c( "", paste0( "\nFrom ",
+                    df.demo.DfRA$k[df.demo.DfRA$k %in% x_lab_sequence],
+                    "\nto ",
+                    df.demo.DfRA$'k+1'[df.demo.DfRA$k %in% x_lab_sequence])
+               )
+
+plot( x, y, type="b",  bty="n", xaxt="n", #yaxt="n",
+      pch=19, col=gray( 0.0,0.25), cex=1.8,
+      xlab="Training Dataset Size", ylab="Distance from Rolling Average",
+      main = "Preview of Distance from Rolling Average for NTEE\nMajor 10 Group Art with Standard Cleaning",
+      cex.main = 1)
+#axis( side = 2, at = seq(0.01, 1.00, 0.01) )
+axis( side = 1, 
+      at= x_lab_sequence,
+      labels = x_labels,
+      cex.axis = 0.75
+      )
+abline( h=seq(0.000, 0.01, 0.001), lwd=0.5, col=gray(0.7,0.3) )
+abline( v=seq(0,max(df.demo$n.train),max(df.demo$n.train)/10), lwd=0.5, col=gray(0.7,0.3) )
+lines( lowess(x,y), col="firebrick", lty=1, lwd=4 )
+box( col=gray(0.7,0.3) )
+points( x, y, type="b", pch=19, col=gray( 0.0,0.25), cex=1.8 )
+
+
+# LOWESS Rolling Average demo graph
+
+x <- df.demo.LOWESS$k
+y <- df.demo.LOWESS$distance.from.rolling.average
+
+x_lab_sequence <- seq(0,max(df.demo$n.train),max(df.demo$n.train)/10)
+x_labels <- c( "", paste0( "\nFrom ",
+                    df.demo.LOWESS$k[df.demo.LOWESS$k %in% x_lab_sequence],
+                    "\nto ",
+                    df.demo.LOWESS$'k+1'[df.demo.LOWESS$k %in% x_lab_sequence])
+               )
+
+plot( x, y, type="b",  bty="n", xaxt="n", #yaxt="n",
+      pch=19, col=gray( 0.0,0.25), cex=1.8,
+      xlab="Training Dataset Size", ylab="Predicted Distance from Rolling Average",
+      main = "Preview of Predicted Distance from Rolling Average for NTEE\nMajor 10 Group Art with Standard Cleaning",
+      cex.main = 1)
+#axis( side = 2, at = seq(0.01, 1.00, 0.01) )
+axis( side = 1, 
+      at= x_lab_sequence,
+      labels = x_labels,
+      cex.axis = 0.75
+      )
+abline( h=seq(0.000, 0.01, 0.0005), lwd=0.5, col=gray(0.7,0.3) )
+abline( v=seq(0,max(df.demo$n.train),max(df.demo$n.train)/10), lwd=0.5, col=gray(0.7,0.3) )
+lines( lowess(x,y), col="firebrick", lty=1, lwd=4 )
+box( col=gray(0.7,0.3) )
+points( x, y, type="b", pch=19, col=gray( 0.0,0.25), cex=1.8 )
+```
+
+As noted earlier, because of how the rolling average neighborhood is defined, we have no values for the last few steps.
+
+In the second and third graphics, the red LOWESS line is meant to act as a visual indicator. Points in the third graph were generated using the predicted values generated by the LOWESS line represented in the first graph.
+
+```{r, include=FALSE}
+#reset parameter settings
+par( mfrow = c(1,1))
+```
+
+# Presenting Results
+
+Now that we have generated (at minimum) demonstration visuals for each graph, we can produce a full suite of visuals juxtaposing the three datasets against each other. The demonstration dataset had the cleaning method dataset and prediction class set. We will need to loop through the relevant combinations of them when generating our complete graphics.
+
+We will focused on identified and predicted rolling averages, followed by a dot plot to present identified thresholds for each prediction class.
+
+Before generating the visualizations, we create a function that can generate our plots with some flexible characteristics (ex. axes) to ensure custom components of each plot as we compare them side by side.
+
+```{r, functions-cpf}
+create_plot_findings <- function( datVar, class.x, var.use, predictedOrNo )
+{
+  df.accuracy.custom <- 
+  datVar %>% 
+    filter( prediction.class==class.x & dataset=="Custom" ) 
+  row.names( df.accuracy.custom ) <- 1:nrow( df.accuracy.custom )
+  
+  df.accuracy.minimal <- 
+  datVar %>% 
+    filter( prediction.class==class.x & dataset=="Minimal" ) 
+  row.names( df.accuracy.minimal ) <- 1:nrow( df.accuracy.minimal )
+  
+  df.accuracy.standard <- 
+  datVar %>% 
+    filter( prediction.class==class.x & dataset=="Standard" ) 
+  row.names( df.accuracy.standard ) <- 1:nrow( df.accuracy.standard )
+  
+  
+  
+  min.y <- min( datVar[ datVar$prediction.class == class.x, var.use ], 
+                na.rm = T )
+  max.y <- max( datVar[ datVar$prediction.class == class.x, var.use ], 
+                na.rm = T )
+  max.x <- max(datVar$k )
+  
+  
+  x <- df.accuracy.standard$k
+  y <- df.accuracy.standard[ , var.use ]
+  
+  plot( x, y, type="b",  bty="n", 
+        pch=19, col=gray( 0.0,0.25), cex=1.8,
+        xlab="Training Dataset Size", 
+        ylab="", 
+        main=class.x, cex.main=1.5,
+        ylim=c(min.y-(max.y*0.1),(max.y *1.1) ),
+        xlim=c(0,max.x-1),
+        xaxt="n"
+        )
+  
+  x_lab_sequence <- seq(0,
+                        max(datVar$k),
+                        max(datVar$k)/10)
+  x_labels <- c( "", paste0( "\nFrom ",
+                    df.accuracy.standard$k[df.accuracy.standard$k %in% x_lab_sequence],
+                    "\nto ",
+                    df.accuracy.standard$'k+1'[df.accuracy.standard$k %in% x_lab_sequence])
+               )
+  
+  axis( side = 1, 
+      at= x_lab_sequence,
+      labels = x_labels,
+      cex.axis = 0.75
+      )
+  
+  # axis( side = 1, at= ceiling(seq(0,max.x,max.x/10 ))[-11] )
+  min.y.line <- min.y - (max.y * 0.1)
+  max.y.line <- (max.y + (max.y * 0.1))
+
+  abline( h=seq(min.y.line, 
+                max.y.line, 
+                (max.y.line - min.y.line ) / 10 ),
+          lwd=0.5, col=gray(0.7,0.3) )
+  
+  abline( h  = 0, lwd=1.5, col="dodgerblue4" )
+  abline( v=seq(0,max.x,max.x/10), lwd=0.5, col=gray(0.7,0.3) )
+  # Below, I changed lowess f value (for smoother) from default 2/3
+  # "The smoother span determines the number of data points which influence the smooth at each value"
+  # Not enough data for the last few x-values, so it is less smooth now
+  points( x, y, type="b", pch=19, col=alpha( "firebrick2",0.25), cex=1.8 )
+  lines( lowess(x,y, 0.4), col=alpha("firebrick", 0.75), lty=1, lwd=4 )
+  box( col=gray(0.7,0.3) )
+
+  #Minimal
+  x <- df.accuracy.minimal$k
+  y <- df.accuracy.minimal[ , var.use ]
+  points( x, y, type="b", pch=21, col=gray( 0.0,0.25), bg=alpha( "green3",0.25), cex=1.8 )
+  lines( lowess(x,y, 0.4), col=alpha("green4", 0.75), lty=1, lwd=4 )
+  
+  #Custom
+  x <- df.accuracy.custom$k
+  y <- df.accuracy.custom[ , var.use ]
+  points( x, y, type="b", pch=21, col=gray( 0.0,0.25), bg=alpha( "deepskyblue3",0.25), cex=1.8 )
+  lines( lowess(x,y, 0.4), col=alpha("deepskyblue4", 0.75), lty=1, lwd=4 )
+  
+  mtext( text= paste0("Distance of Value Change From ", predictedOrNo,
+                      "Rolling Average"),
+         side=3, line=1, outer=TRUE, cex=1.5, col="gray40" )
+}
+```
+
+## Distance from Rolling Average
+
+We will now create a dataframe that takes the process of creating our demo dataframe for **identified** distance from rolling average, `df.demo.DfRA`, and repeats the process for each of our 18 prediction classes of interest across the three datasets of cleaning methods.
+
+```{r}
+find_performance <- function( class.x ){
+  for( d in unique( df.summary$dataset ) ){
+    df.subset <- df.summary %>% 
+      filter( prediction.class==class.x & dataset==d ) 
+      
+    output <- NULL
+    df.accuracy <- as.data.frame(NULL)
+    
+    for( i in 1:( nrow( df.subset ) ) ){
+      temp <- find_rolling_average( dataset = df.subset, column = "value", row = i )
+      df.accuracy <- rbind( df.accuracy, temp )
+    }
+    
+    output <- cbind( d, df.accuracy )
+    x <- paste0("output.",d)
+    eval(call("<-", as.name(x), output ) )
+  }
+  
+  full.out <- NULL
+  for( d in unique( df.summary$dataset ) ){
+    full.out <- rbind( full.out, get(paste0("output.",d)))
+  }
+  
+  row.names( full.out ) <- 1:nrow( full.out )
+  full.out <- as.data.frame( cbind( class.x, "Balanced Accuracy", full.out ), stringsAsFactors = F )
+  names( full.out )[1:3] <- c( "prediction.class", "metric.type", "dataset")
+  return( full.out )
+}
+
+dat.DfRA <- NULL
+holder <- NULL
+  
+for( L in c(classes.nt, classes.te) ){
+  holder <- find_performance( class.x=L )
+  dat.DfRA <- rbind( dat.DfRA, holder )
+}
+
+dat.DfRA[ , 5:8 ] <- lapply( dat.DfRA[ , 5:8 ], as.numeric )
+```
+
+
+### Tax-exempt purpose codes
+
+Using our function, we can generate our visualizations for each prediction class. Let's begin with the eight tax-exempt purpose codes.
+
+```{r, figures-DfRA-te, fig.show="hold", out.width="100%"}
+#par(mar = c(4, 4, 5, .1))
+par( mfrow=c(3,2), mar=c(2,2,4,1), oma=c(0,0,3,0) )
+
+for( j in classes.te ){
+    create_plot_findings( datVar = dat.DfRA, class.x=j, 
+                          var.use = "distance.from.rolling.average",
+                          predictedOrNo = "")
+}
+```
+
+### NTEE Major 10 Groups
+
+We continue with the NTEE Major 10 groups.
+
+```{r, figures-DfRA-ntee, fig.show="hold", out.width="100%"}
+#par(mar = c(4, 4, 5, .1))
+par( mfrow=c(3,2), mar=c(2,2,4,1), oma=c(0,0,3,0) )
+
+vars.can.use <- names( dat.DfRA[ , 4:9])
+var.to.use <- vars.can.use[6]
+
+for( j in classes.nt ){
+  create_plot_findings( datVar = dat.DfRA, class.x=j, 
+                        var.use = "distance.from.rolling.average", 
+                        predictedOrNo = "" )
+}
+```
+
+## Predicted Distance from Rolling Average
+
+We will now create a dataframe that takes the process of creating our demo dataframe for **predicted** distance from rolling average, `df.demo.LOWESS`, and repeats the process for each of our 18 prediction classes of interest across the three datasets of cleaning methods.
+
+```{r}
+find_performance_pred <- function( class.x ){
+  for( d in unique( df.summary$dataset ) ){
+    df.subset <- df.summary %>% 
+      filter( prediction.class==class.x & dataset==d ) 
+      
+    x <- df.subset$n.train
+    y <- df.subset$value
+        
+    lw <- as.data.frame( lowess( y ~ x ) ) 
+    lw$"n.train" <- lw$x
+    
+    output <- NULL
+    df.accuracy <- as.data.frame(NULL)
+    
+    for( i in 1:( length( lw$y ) ) ){
+      temp <- find_rolling_average( dataset = lw, column = "y", row = i )
+      df.accuracy <- rbind( df.accuracy, temp )
+    }
+    
+    output <- cbind( d, df.accuracy )
+    x <- paste0("output.",d)
+    eval(call("<-", as.name(x), output ) )
+  }
+  
+  full.out <- NULL
+  for( d in unique( df.summary$dataset ) ){
+    full.out <- rbind( full.out, get(paste0("output.",d)))
+  }
+  
+  row.names( full.out ) <- 1:nrow( full.out )
+  full.out <- as.data.frame( cbind( class.x, "Balanced Accuracy", full.out ), stringsAsFactors = F )
+  names( full.out )[1:3] <- c( "prediction.class", "metric.type", "dataset")
+  return( full.out )
+}
+
+dat.lowess <- NULL
+holder <- NULL
+  
+for( L in c(classes.nt, classes.te) ){
+  holder <- find_performance_pred( class.x=L )
+  dat.lowess <- rbind( dat.lowess, holder )
+}
+
+dat.lowess[ , 5:8 ] <- lapply( dat.lowess[ , 5:8 ], as.numeric )
+```
+
+
+### Tax-exempt purpose codes
+
+Using our function, we can generate our visualizations for each prediction class. Let's begin with the eight tax-exempt purpose codes.
+
+```{r, figures-LO-te, fig.show="hold", out.width="100%"}
+#par(mar = c(4, 4, 5, .1))
+par( mfrow=c(3,2), mar=c(2,2,4,1), oma=c(0,0,3,0) )
+
+for( j in classes.te ){
+    create_plot_findings( datVar = dat.lowess, class.x=j, 
+                          var.use = "distance.from.rolling.average",
+                          predictedOrNo = "Predicted ")
+}
+```
+
+### NTEE Major 10 Groups
+
+We continue with the NTEE Major 10 groups.
+
+```{r, figures-LO-ntee, fig.show="hold", out.width="100%"}
+#par(mar = c(4, 4, 5, .1))
+par( mfrow=c(3,2), mar=c(2,2,4,1), oma=c(0,0,3,0) )
+
+vars.can.use <- names( dat.lowess[ , 4:9])
+var.to.use <- vars.can.use[6]
+
+for( j in classes.nt ){
+  create_plot_findings( datVar = dat.lowess, class.x=j, 
+                        var.use = "distance.from.rolling.average", 
+                        predictedOrNo = "Predicted ")
+}
+```
+
+
+## Dot Plot
+
+http://r-statistics.co/Top50-Ggplot2-Visualizations-MasterList-R-Code.html#Dot%20Plot
+
+
+
+### Tax-exempt purpose codes
+
+
+### NTEE Major 10 Groups

@@ -1,0 +1,24 @@
+Raw data cleaning
+
+The files contain all approved filings
+Source page: https://www.irs.gov/charities-non-profits/exempt-organizations-form-1023ez-approvals
+
+- Using 2018 and 2019 because the have the field "MISSION"
+-- See crosswalk in this folder
+- Dropped all organizations with "", indicating blanks, in field "MISSION"
+- Saved cleaned files as .CSV
+
+# of observations/applications:
+2018 full source: 54,773
+2018 dropped blanks: 4,861
+2018 without blanks: 49,912
+2019 full source:    56,146
+2019 dropped blanks: 2
+2019 without blanks: 56,144
+
+Added new column, "Nteebasic"
+- Only reports the first letter from the 3-character "Nteecode" field
+Added new column, "Year"
+- contains the year of the approved filings
+f1023EZ_approvals_2019.csv: 
+- Changed column "Ein" to "EIN"

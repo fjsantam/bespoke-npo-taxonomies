@@ -1,0 +1,360 @@
+---
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=F, warning=F, fig.width=10)
+```
+
+
+
+
+```{r}
+library( dplyr )
+library( knitr )
+
+d <- read.csv( "data/model-accuracy.csv" )
+
+d$f <- d$prediction.class
+
+d$f[ d$f == "Disasterreliefyes"  ] <- "Disaster Relief"
+d$f[ d$f == "Donatefundsyes"  ] <- "Donative"
+d$f[ d$f == "ntmaj10art"  ] <- "NTMAJ Art"
+d$f[ d$f == "ntmaj10edu"  ] <- "NTMAJ Education"
+d$f[ d$f == "ntmaj10env"  ] <- "NTMAJ Environment"
+d$f[ d$f == "ntmaj10health"  ] <- "NTMAJ Health"
+d$f[ d$f == "ntmaj10hserv"  ] <- "NTMAJ Human Service"
+d$f[ d$f == "ntmaj10int"  ] <- "NTMAJ International"
+d$f[ d$f == "ntmaj10mutual"  ] <- "NTMAJ Mutual Benefit"
+d$f[ d$f == "ntmaj10public"  ] <- "NTMAJ Public"
+d$f[ d$f == "ntmaj10rel"  ] <- "NTMAJ Religion"
+d$f[ d$f == "ntmaj10unknown"  ] <- "NTMAJ Unknown"
+d$f[ d$f == "Onethirdsupportgifts"  ] <- "Support by Gift"
+d$f[ d$f == "Onethirdsupportpublic"   ] <- "Support by Public"
+d$f[ d$f == "Orgpurposecharitable"  ] <- "Charitable Purpose"
+d$f[ d$f == "Orgpurposecrueltyprevention"  ] <- "Cruelty Prevention"
+d$f[ d$f == "Orgpurposeeducational"   ] <- "Education"
+d$f[ d$f == "Orgpurposeliterary"  ] <- "Literary"
+d$f[ d$f == "Orgpurposepublicsafety"  ] <- "Public Safety"
+d$f[ d$f == "Orgpurposereligious"  ] <- "Religious"
+d$f[ d$f == "Orgpurposescientific"  ] <- "Scientific"
+d$f[ d$f == "Orgpurposeamateursports"  ] <- "Amateur Sports"
+
+d <- arrange( d, dataset, f, n.train )
+head( d, 21 )
+
+d$dy <- 100* ( c( d$value[-1], NA ) - d$value ) 
+# 100 * ( new - old), where 
+## old = current training dataset size, ex. 4,000
+## new = next training dataset size up, ex. 8,000 is one size up from 4,000
+d$dy[ d$n.train == 4000 ] <- NA #can't go from 0 to 4,000
+d$dy[ d$n.train == 80000 ] <- NA #can't go from 80,000 to 84,000
+
+
+d %>% 
+  group_by( n.train ) %>% 
+  summarize( bal_accuracy=100*mean(value), ave=mean(dy) ) #renamed accuracy to bal_accuracy
+
+```
+
+
+
+
+```{r}
+graph.df <- 
+  d %>% 
+  group_by( dataset, f ) %>% 
+  summarize( threshold.50=n.train[ which.max( dy < 0.5 )  -1 ], 
+             threshold.25=n.train[ which.max( dy < 0.25 ) -1 ],
+             performance.50=value[ which.max( dy < 0.5 ) -1 ],
+             performance.25=value[ which.max( dy < 0.25 ) -1 ] ) %>% 
+  group_by( f ) %>%
+  mutate( ave.p.50=mean(performance.50), 
+          ave.p.25=mean(performance.25) ) %>% 
+  ungroup() %>% 
+  arrange( - ave.p.50 ) %>% 
+  as.data.frame() 
+
+head( graph.df, 20 ) 
+```
+
+
+```{r}
+
+df <- graph.df
+
+cex.factor <- 1.5
+
+min.x <- min( df$threshold.50 )
+max.x <- max( df$threshold.50 )
+
+df2 <- filter( df, ave.p.50 > 0.60 )
+df3 <- filter( df, ave.p.50 < 0.60 )
+
+mean.minimal.2 <- mean( df2$threshold.50[ df2$dataset=="Minimal" ] )
+mean.standard.2 <- mean( df2$threshold.50[ df2$dataset=="Standard" ] )
+mean.custom.2 <- mean( df2$threshold.50[ df2$dataset=="Custom" ] )
+
+mean.minimal.3 <- mean( df3$threshold.50[ df3$dataset=="Minimal" ] )
+mean.standard.3 <- mean( df3$threshold.50[ df3$dataset=="Standard" ] )
+mean.custom.3 <- mean( df3$threshold.50[ df3$dataset=="Custom" ] )
+
+
+df$threshold.50[ df$dataset == "Minimal" ] <-
+    df$threshold.50[ df$dataset == "Minimal" ] - 1000
+df$threshold.50[ df$dataset == "Custom" ] <-
+    df$threshold.50[ df$dataset == "Custom" ] + 1000
+
+df.ave.p <- unique(df[c("f","ave.p.50")])
+p.class <- df.ave.p$f
+
+mean.p <- df.ave.p$ave.p.50
+mean.p <- as.character( mean.p %>% round(4) )
+mean.p <- substr( mean.p, 1, 4 )
+
+#col.group <- adjustcolor( c("steelblue","firebrick","darkgreen"), alpha.f=0.5 )
+col.group <- adjustcolor( c("deepskyblue3","firebrick3","green3"), alpha.f=0.5 ) #standardizing colors with box and whisker plot
+
+
+```
+
+
+```{r, fig.width=8, fig.height=12}
+
+ 
+par( mar=c(5,12,4,4) ) #tweaked left margin to not cut off names
+plot.new()
+plot.window( xlim=c(min.x-2000,max.x+2000), ylim=c(1,24) )
+
+# abline( v=seq(min.x,max.x,4000), h=1:10, lty=3, col="gray70" )
+abline( h=22:10, lty=3, col="gray70" )
+
+
+y.pos <- 22
+
+# mean.p <- NULL
+
+for( i in p.class )
+{
+   dd <- filter( df, f == i )
+   if( y.pos > 9 )
+   {
+       points( dd$threshold.50, rep(y.pos,3), 
+               col=col.group, pch=19, 
+               cex=2*cex.factor )
+   }   
+
+   if( y.pos <= 9 )
+   {
+       points( dd$threshold.50, rep(y.pos,3), 
+               col=gray(0.5,0.5), pch=19, 
+               cex=2*cex.factor )
+   }
+
+   y.pos <- y.pos - 1
+}
+
+
+axis( side=2, at=22:10, labels=p.class[1:13], 
+      las=2, tick=F, cex.axis=0.8*cex.factor )
+axis( side=2, at=9:1, labels=p.class[14:22], 
+      las=2, tick=F, cex.axis=0.8*cex.factor, 
+      col.axis="gray40" )
+
+axis( side=1, at=seq(min.x,max.x,4000), 
+      labels=paste0( seq(min.x/1000,max.x/1000,4), "k" ), 
+      las=1, tick=F, cex.axis=0.7*cex.factor )
+axis( side=4, at=22:1, las=2, tick=F, 
+      labels=mean.p, col.axis="gray40", cex.axis=0.7*cex.factor )
+
+title( xlab="Number of Training Cases", cex.lab=cex.factor )
+
+# mean.minimal <- median( df$threshold.50[ df$dataset=="Minimal" ] )
+# mean.standard <- median( df$threshold.50[ df$dataset=="Standard" ] )
+# mean.custom <- median( df$threshold.50[ df$dataset=="Custom" ] )
+# 
+# abline( v=mean.minimal, lwd=3, col=adjustcolor("firebrick", alpha.f=0.5) )
+# abline( v=mean.standard, lwd=3, col=adjustcolor("darkgreen", alpha.f=0.5) )
+# abline( v=mean.custom, lwd=3, col=adjustcolor("steelblue", alpha.f=0.5) )
+
+segments( x0=mean.minimal.2, y0=10, y1=22, 
+          lwd=3*cex.factor, col=adjustcolor("green3", alpha.f=0.5) )
+segments( x0=mean.standard.2, y0=10, y1=22, 
+          lwd=3*cex.factor, col=adjustcolor("firebrick3", alpha.f=0.5) )
+segments( x0=mean.custom.2, y0=10, y1=22, 
+          lwd=3*cex.factor, col=adjustcolor("deepskyblue3", alpha.f=0.5) )
+
+text( 17000, 10, "~17k", pos=1, col="gray10", cex=1.2*cex.factor )
+
+segments( x0=mean.minimal.3, y0=1, y1=9, 
+          lwd=3*cex.factor, col=gray(0.5,0.5) )
+segments( x0=mean.standard.3, y0=1, y1=9, 
+          lwd=3*cex.factor, col=gray(0.5,0.5) )
+segments( x0=mean.custom.3, y0=1, y1=9, 
+          lwd=3*cex.factor, col=gray(0.5,0.5) )
+
+
+title( main="Optimal Training Dataset Size", cex.main=cex.factor )
+
+
+yy <- 24
+xx <- 2000
+
+text( xx-2000, yy, "DATA PREP:", pos=4, 
+      cex=0.80*cex.factor, col="gray20" )
+
+text( xx+12000, yy, "BASIC", col="green3", 
+      cex=0.70*cex.factor, pos=4 )
+points( xx+12000, yy, pch=19, 
+        cex=0.9*cex.factor, col="green3" )
+
+text( xx+20000, yy, "STANDARD", col="firebrick3", 
+      cex=0.70*cex.factor, pos=4 )
+points( xx+20000, yy, pch=19, 
+        cex=0.9*cex.factor, col="firebrick3" )
+
+text( xx+30000, yy, "CUSTOM", 
+      col="deepskyblue3", cex=0.70*cex.factor, pos=4 )
+points( xx+30000, yy, pch=19, 
+        cex=0.9*cex.factor, col="deepskyblue3" )
+
+text( 28000, 4, "HIDDEN \nCLASSES", col="gray80", cex=1.3*cex.factor )
+
+
+text( 40350, 22.5, "Balanced Accuracy:", col="gray40", pos=2)
+
+
+#Add vertical lines for the shown classes only
+
+# abline( v=seq(min.x,max.x,4000), h=1:10, lty=3, col="gray70" )
+mult_seg <- data.frame(x0 = seq(min.x,max.x,4000),    # Create data frame with line-values
+                       y0 = 10,
+                       y1 = 22)
+
+segments(x0 = mult_seg$x0,                            # Draw multiple lines
+         y0 = mult_seg$y0,
+         y1 = mult_seg$y1,
+         col = "gray70", 
+         lty = 3)
+
+
+```
+
+
+
+# Optimal Size as Function of Model Accuracty
+
+
+```{r}
+#############################
+#############################
+#############################
+
+df <- 
+  d %>% 
+  group_by( dataset, f ) %>% 
+  summarize( threshold.50=n.train[ which.max( dy < 0.5 )  -1 ], 
+             threshold.25=n.train[ which.max( dy < 0.25 ) -1 ],
+             performance.50=value[ which.max( dy < 0.5 ) -1 ],
+             performance.25=value[ which.max( dy < 0.5 ) -1 ] ) %>%  
+  as.data.frame() %>%
+  arrange( f )
+
+df$threshold.50[ df$dataset == "Minimal" ] <- 
+    df$threshold.50[ df$dataset == "Minimal" ] - 1000
+df$threshold.50[ df$dataset == "Custom" ] <- 
+    df$threshold.50[ df$dataset == "Custom" ] + 1000
+
+# plot( df$threshold.50, df$performance.50,  bty="n",
+#       pch=19, col=gray(0.5,0.5), cex=2,
+#       xlab="Optimal Dataset Size",
+#       ylab="Model Accuracy" )
+# 
+# lines( lowess(x=df$threshold.50, y=df$performance.50), 
+#        col = "red", lwd=3, lty=3 )
+
+plot( df$performance.50, df$threshold.50, bty="n",
+      pch=19, col=gray(0.5,0.5), cex=2,
+      ylab="Optimal Training Dataset Size",
+      xlab="Model Accuracy" )
+
+lines( lowess(x=df$performance.50, y=df$threshold.50), 
+       col = "red", lwd=3, lty=3 )
+
+```
+
+
+
+# Threshold of 0.25 Gain
+
+```{r}
+
+min.x <- min( df$threshold.25 )
+max.x <- max( df$threshold.25 )
+
+
+# add jitter for overlap
+df$threshold.25[ df$dataset == "Minimal" ] <- 
+    df$threshold.25[ df$dataset == "Minimal" ] - 1000
+df$threshold.25[ df$dataset == "Custom" ] <- 
+    df$threshold.25[ df$dataset == "Custom" ] + 1000
+
+
+par( mar=c(5,10,4,4) )
+plot.new()
+plot.window( xlim=c(min.x-2000,max.x+2000), ylim=c(1,22) )
+
+col.group <- adjustcolor( c("steelblue","firebrick","darkgreen"), alpha.f=0.5 )
+ 
+# abline( v=seq(min.x,max.x,4000), lty=3, col="gray70" )
+abline( h=1:22, lty=3, col="gray70" )
+
+p.class <- unique(df$f)
+p.class <- c( p.class[8:17], p.class[1:7], p.class[18:22] )
+
+y.pos <- 22
+
+mean.p <- NULL
+
+for( i in p.class )
+{
+   dd <- filter( df, f == i )
+   points( dd$threshold.25, rep(y.pos,3), 
+           col=col.group, pch=19, cex=2 )
+   mp <- as.character( mean( dd$performance.25 ) %>% round(4) )
+   mp <- substr( mp, 1, 4 )
+   mean.p <- c( mean.p, mp )
+   y.pos <- y.pos - 1
+}
+
+axis( side=2, at=22:1, labels=p.class, 
+      las=2, tick=F, cex.axis=0.8 )
+axis( side=1, at=seq(min.x,max.x,4000), 
+      labels=paste0(seq(min.x/1000,max.x/1000,4),"k"), 
+      las=1, tick=F, cex.axis=0.6 )
+axis( side=4, at=22:1, las=2, tick=F, 
+      labels=mean.p, col.axis="gray40", cex.axis=0.7 )
+
+mean.minimal <- median( df$threshold.25[ df$dataset=="Minimal" ] )
+mean.standard <- median( df$threshold.25[ df$dataset=="Standard" ] )
+mean.custom <- median( df$threshold.25[ df$dataset=="Custom" ] )
+
+abline( v=mean.minimal, lwd=3, col=adjustcolor("firebrick", alpha.f=0.5) )
+abline( v=mean.standard, lwd=3, col=adjustcolor("darkgreen", alpha.f=0.5) )
+abline( v=mean.custom, lwd=3, col=adjustcolor("steelblue", alpha.f=0.5) )
+
+title( main="Optimal Training Dataset Size" )
+
+
+
+text( 40000, 10.5, "DATA PREP:", pos=4, cex=0.60, col="gray40" )
+points( rep(44000,3), c(9.5,8.5,7.5), cex=0.6, 
+        pch=19, col=c("firebrick","darkgreen","steelblue") )
+text( 44000, 9.5, "Custom", col="firebrick", cex=0.70, pos=4 )
+text( 44000, 8.5, "Standard", col="darkgreen", cex=0.70, pos=4 )
+text( 44000, 7.5, "Basic", col="steelblue", cex=0.70, pos=4 )
+
+
+
+```
+

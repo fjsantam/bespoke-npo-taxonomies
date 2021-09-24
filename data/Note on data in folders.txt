@@ -1,0 +1,1 @@
+Each folder contains the data used to perform that step, not the output from that step.
