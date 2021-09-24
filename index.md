@@ -17,6 +17,18 @@ Relevant replication files (where space permits) are also hosted in this GitHub 
 
 # Replication Steps
 
+## Contents
+
+1. [STEP 01: Data Cleaning](step-01-data-preprocessing.html)
+2. [STEP 02: Merge and Refine](step-02-merge-and-refine-data.html)
+3. [STEP 03: Classification Simulations](step-03-classification-bootstrapping.html)
+4. [STEP 04: Combine Output Files](step-04-combine-bootstrap-output-files.html)
+5. [STEP 05: Analyze Results](step-05-analyze-bootstrap-results.html)
+
+<br>
+<hr>
+<br>
+
 ## Data Cleaning Steps
 
 [Files referenced in this section](https://doi.org/10.7910/DVN/BL6XLW)
