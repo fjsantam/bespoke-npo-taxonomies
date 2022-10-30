@@ -1,8 +1,3 @@
----
-layout: default
-title: Replication Files
----
-
 This is a website that hosts replication steps and files for the paper ([link](https://www.lecy.info/s/HowToCodeAMillionMissions-VOLUNTAS.pdf)):
 
 > Santamarina, F. J., Lecy, J. D., & van Holm, E. J. (2021). How to Code a Million Missions: Developing Bespoke Nonprofit Activity Codes Using Machine Learning Algorithms. VOLUNTAS: International Journal of Voluntary and Nonprofit Organizations, 1-10.
