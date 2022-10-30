@@ -3,9 +3,9 @@ layout: default
 title: Replication Files
 ---
 
-This is a website that hosts replication steps and files for the paper (under review):
+This is a website that hosts replication steps and files for the paper ([link](https://www.lecy.info/s/HowToCodeAMillionMissions-VOLUNTAS.pdf)):
 
-> Santamarina, F. J., Lecy, J. D., & van Holm, E.J. How To Code A Million Missions: Developing Bespoke Nonprofit Activity Codes Using Machine Learning Algorithms.
+> Santamarina, F. J., Lecy, J. D., & van Holm, E. J. (2021). How to Code a Million Missions: Developing Bespoke Nonprofit Activity Codes Using Machine Learning Algorithms. VOLUNTAS: International Journal of Voluntary and Nonprofit Organizations, 1-10.
 
 # Data Sources
 
@@ -16,18 +16,6 @@ For all data used and generated as part of this paper, please visit our Harvard 
 Relevant replication files (where space permits) are also hosted in this GitHub repository under ["data"](/data).
 
 # Replication Steps
-
-## Contents
-
-1. [STEP 01: Data Cleaning](step-01-data-preprocessing.html)
-2. [STEP 02: Merge and Refine](step-02-merge-and-refine-data.html)
-3. [STEP 03: Classification Simulations](step-03-classification-bootstrapping.html)
-4. [STEP 04: Combine Output Files](step-04-combine-bootstrap-output-files.html)
-5. [STEP 05: Analyze Results](step-05-analyze-bootstrap-results.html)
-
-<br>
-<hr>
-<br>
 
 ## Data Cleaning Steps
 
